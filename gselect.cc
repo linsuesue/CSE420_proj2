@@ -30,30 +30,30 @@ GSelectBP::GSelectBP(const GSelectBPParams *params)
          
 bool GSelectBP::lookup(ThreadID tid, Addr branchAddr, void * &bpHistory)
 {
+   bool taken;
+    // m bits from branch address
+    unsigned mBits = calcLookupIndex(branch_addr);
+    //n bits from global shift register
+    unsigned nBits = globalHistoryReg[tid] & historyRegisterMask;
+    //concatenate m bits 
+    //shift n bits m to the left
+    nBits = nBits << branchAddrBits;
+    // Add m + n
+    unsigned predIndex = nBits + mBits;
 
-//begin 2bit local implementation (from class powerpoint)
-    bool taken;    
-    //get the index from the branch address
-    unsigned local_predictor_idx = getLocalIndex(branchAddr);    
-    DPRINTF(Fetch, "Looking up index %#x\n", local_predictor_idx);        
-    //access the counter
-    //uint8_t counter_val = localCtrs[local_predictor_dx];    
-    //DPRINTF(Fetch, "prediction is %i.\n", (int)counter_val);
-    //predict from counter's value, if MSB is 1
-    //taken = getPrediction(counter_val);
+    // determin taken or not taken 
+    // see whether counter is less than or greater than half
+    taken = counterThreshold < CounterCtrs[predIndex];
 
-//begin bimodal implementation (from class powerpoint)
+    // update history
     BPHistory *history = new BPHistory;
-    history->globalHistoryReg	 = globalHistoryReg[tid];
-    bpHistory = static_cast<void*>(history);
-   //prediction functionality
-   
-   //update history object and global history register with prediction
-   //updates finalPrediction
-   updateGlobalHistReg(tid, history->finalPrediction);
-   
-   //global history final prediction
-    return taken;
+    history->globalHistoryReg = globalHistoryReg[tid];
+    history->globalPrediction = taken;
+
+   bp_history = static_cast<void*>(history);
+   updateGlobalHistReg(tid, taken);
+
+   return taken;
 }
 
 void GSelectBP::btbUpdate(ThreadID tid, Addr branchAddr, void * &bpHistory)
